@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Interactive Floor Plan Editor (30m x 20m)</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --wall-solid: #1e293b;
+            --corridor-bg: #f8fafc;
+            --stair-bg: #cbd5e1;
+            --wet-bg: #f0fdf4;
+            --utility-bg: #fffbeb;
+            --room-bg: #ffffff;
+            --grid-line: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        h1 { font-size: 1.6rem; color: #f1f5f9; }
+        p { font-size: 0.85rem; color: #94a3b8; margin-top: 4px; }
+
+        .workspace {
+            display: flex;
+            gap: 20px;
+            background-color: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);
+            width: 1240px;
+        }
+
+        .toolbar {
+            width: 240px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background-color: #0f172a;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+
+        .tool-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .tool-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            margin-bottom: 2px;
+            font-weight: 700;
+        }
+
+        .btn {
+            background-color: #334155;
+            color: #f8fafc;
+            border: none;
+            padding: 10px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover { background-color: #475569; }
+        .btn.active { background-color: var(--primary); font-weight: 600; }
+        .btn-danger { background-color: #991b1b; }
+        .btn-danger:hover { background-color: #b91c1c; }
+
+        .canvas-container {
+            position: relative;
+            background-color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow: auto;
+        }
+
+        .floorplan-frame {
+            position: relative;
+            width: 960px;
+            height: 640px;
+            background-color: var(--room-bg);
+            border: 8px solid var(--wall-solid);
+            user-select: none;
+        }
+
+        .upper-region {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 384px;
+            display: flex;
+            border-bottom: 4px solid var(--wall-solid);
+        }
+
+        .main-suite {
+            width: 33.333%;
+            height: 100%;
+            border-right: 4px solid var(--wall-solid);
+            display: flex;
+            position: relative;
+        }
+        .main-suite:last-child { border-right: none; }
+
+        .sub-office {
+            flex: 1;
+            height: 100%;
+            border-right: 2px dashed #94a3b8;
+            padding: 8px;
+            font-size: 0.65rem;
+            color: #475569;
+            font-weight: bold;
+        }
+        .sub-office:last-child { border-right: none; }
+
+        .center-corridor {
+            position: absolute;
+            top: 384px;
+            left: 0;
+            width: 100%;
+            height: 64px;
+            background-color: var(--corridor-bg);
+            border-bottom: 4px solid var(--wall-solid);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #64748b;
+            letter-spacing: 0.2em;
+            z-index: 10;
+        }
+
+        .lower-region {
+            position: absolute;
+            top: 448px;
+            left: 0;
+            width: 100%;
+            height: 176px;
+            display: flex;
+        }
+
+        .stairwell {
+            width: 64px;
+            height: 100%;
+            background-color: var(--stair-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            color: #334155;
+            font-weight: bold;
+            text-align: center;
+            border-right: 4px solid var(--wall-solid);
+            background-image: linear-gradient(rgba(0,0,0,0.05) 50%, transparent 50%), linear-gradient(90deg, rgba(0,0,0,0.05) 50%, transparent 50%);
+            background-size: 10px 10px;
+        }
+        .stairwell.right-end {
+            border-right: none;
+            border-left: 4px solid var(--wall-solid);
+        }
+
+        .rooms-strip {
+            flex: 1;
+            height: 100%;
+            display: flex;
+        }
+
+        .room-module {
+            width: 92.4px;
+            height: 100%;
+            border-right: 4px solid var(--wall-solid);
+            position: relative;
+            padding: 6px;
+            font-size: 0.65rem;
+            font-weight: bold;
+            color: #334155;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .room-module:last-child { border-right: none; }
+
+        .wet-shower { background-color: #ecfdf5; }
+        .utility-core { background-color: #fffbeb; width: 64px !important; }
+        .half-toilet { background-color: #fef2f2; width: 45px !important; }
+
+        .interactive-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 30;
+            pointer-events: auto;
+        }
+
+        .added-wall {
+            position: absolute;
+            background-color: var(--wall-solid);
+            cursor: pointer;
+            z-index: 40;
+        }
+        .added-wall.v-wall { width: 6px; transform: translateX(-3px); }
+        .added-wall.h-wall { height: 6px; transform: translateY(-3px); }
+
+        .added-door {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-left: 3px solid #b45309;
+            border-top: 3px dashed #b45309;
+            border-top-left-radius: 100%;
+            cursor: pointer;
+            z-index: 45;
+        }
+
+        .added-window {
+            position: absolute;
+            width: 32px;
+            height: 8px;
+            background-color: #bae6fd;
+            border: 2px solid #0284c7;
+            cursor: pointer;
+            z-index: 45;
+            transform: translateY(-4px);
+        }
+
+        .facade-window {
+            position: absolute;
+            width: 40px;
+            height: 8px;
+            background-color: #bae6fd;
+            border: 2px solid #0284c7;
+        }
+
+        .status-bar {
+            margin-top: 10px;
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Architectural CAD Floor Plan Studio</h1>
+        <p>Scale: 1 Meter = 32px | Outer Boundary: 30m × 20m | Core Corridor & Structural Shell Locked</p>
+    </header>
+
+    <div class="workspace">
+        <div class="toolbar">
+            <div class="tool-group">
+                <div class="tool-title">Modality Active Engine</div>
+                <button class="btn active" onclick="setMode('inspect')" id="tool-inspect">🔍 Inspect / Move</button>
+            </div>
+            
+            <div class="tool-group">
+                <div class="tool-title">Framing Additions</div>
+                <button class="btn" onclick="setMode('wall-v')" id="tool-wall-v">🧱 Vertical Wall Partition</button>
+                <button class="btn" onclick="setMode('wall-h')" id="tool-wall-h">🧱 Horizontal Wall Partition</button>
+                <button class="btn" onclick="setMode('door')" id="tool-door">🚪 Structural Swing Door</button>
+                <button class="btn" onclick="setMode('window')" id="tool-window">🪟 Custom Window Opening</button>
+            </div>
+
+            <div class="tool-group">
+                <div class="tool-title">Deconstruction Modification</div>
+                <button class="btn btn-danger" onclick="setMode('delete')" id="tool-delete">🗑️ Erase Component</button>
+            </div>
+            
+            <div class="tool-group" style="margin-top: auto;">
+                <div class="tool-title">Canvas Clear Options</div>
+                <button class="btn" onclick="clearCustomizations()" style="background-color: #4c1d95;">🔄 Reset Custom Layers</button>
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <div class="floorplan-frame" id="blueprintFrame">
+                
+                <div class="facade-window" style="top: -4px; left: 50px;"></div>
+                <div class="facade-window" style="top: -4px; left: 130px;"></div>
+                <div class="facade-window" style="top: -4px; left: 220px;"></div>
+                <div class="facade-window" style="top: -4px; left: 310px;"></div>
+                <div class="facade-window" style="top: -4px; left: 400px;"></div>
+                <div class="facade-window" style="top: -4px; left: 490px;"></div>
+                <div class="facade-window" style="top: -4px; left: 580px;"></div>
+                <div class="facade-window" style="top: -4px; left: 670px;"></div>
+                <div class="facade-window" style="top: -4px; left: 760px;"></div>
+                <div class="facade-window" style="top: -4px; left: 840px;"></div>
+                <div class="facade-window" style="top: -4px; left: 910px;"></div>
+
+                <div class="upper-region">
+                    <div class="main-suite">
+                        <div class="sub-office">Suite A-1</div><div class="sub-office">A-2</div><div class="sub-office">A-3</div><div class="sub-office">A-4</div><div class="sub-office">A-5</div>
+                    </div>
+                    <div class="main-suite">
+                        <div class="sub-office">Suite B-1</div><div class="sub-office">B-2</div><div class="sub-office">B-3</div><div class="sub-office">B-4</div><div class="sub-office">B-5</div>
+                    </div>
+                    <div class="main-suite">
+                        <div class="sub-office">Suite C-1</div><div class="sub-office">C-2</div><div class="sub-office">C-3</div><div class="sub-office">C-4</div><div class="sub-office">C-5</div>
+                    </div>
+                </div>
+
+                <div class="center-corridor">CENTRAL CORRIDOR (WIDTH: 2.00m)</div>
+
+                <div class="lower-region">
+                    <div class="stairwell">STAIRS<br>DOWN</div>
+                    <div class="rooms-strip">
+                        <div class="room-module"><span>Room L-1</span></div>
+                        <div class="room-module"><span>Room L-2</span></div>
+                        <div class="room-module"><span>Room L-3</span></div>
+                        
+                        <div class="room-module wet-shower"><span>Men's<br>Shower</span></div>
+                        <div class="room-module utility-core"><span>Utility<br>Vault</span></div>
+                        <div class="room-module half-toilet"><span>Half<br>WC</span></div>
+                        <div class="room-module wet-shower"><span>Women's<br>Shower</span></div>
+                        
+                        <div class="room-module"><span>Room R-1</span></div>
+                        <div class="room-module"><span>Room R-2</span></div>
+                        <div class="room-module"><span>Room R-3</span></div>
+                    </div>
+                    <div class="stairwell right-end">STAIRS<br>DOWN</div>
+                </div>
+
+                <div class="facade-window" style="bottom: -4px; left: 50px;"></div>
+                <div class="facade-window" style="bottom: -4px; left: 130px;"></div>
+                <div class="facade-window" style="bottom: -4px; left: 220px;"></div>
+                <div class="facade-window" style="bottom: -4px; left: 310px;"></div>
+                <div class="facade-window" style="bottom: -4px; left: 400px;"></div>
+                <div class="facade-window" style="bottom: -4px; left: 490px;"></div>
+                <div class="facade-window" style="bottom: -4px; left: 580px;"></div>
+                <div class="facade-window" style="bottom: -4px; left: 670px;"></div>
+                <div class="facade-window" style="bottom: -4px; left: 760px;"></div>
+                <div class="facade-window" style="bottom: -4px; left: 840px;"></div>
+                <div class="facade-window" style="bottom: -4px; left: 910px;"></div>
+
+                <div class="interactive-overlay" id="clickOverlay"></div>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar" id="statusBar">Active Mode: Inspect / Move | Click within layout to select structural components.</div>
+
+    <script>
+        let currentMode = 'inspect';
+        const blueprintFrame = document.getElementById('blueprintFrame');
+        const clickOverlay = document.getElementById('clickOverlay');
+        const statusBar = document.getElementById('statusBar');
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+            const activeBtn = document.getElementById(`tool-${mode}`);
+            if (activeBtn) activeBtn.classList.add('active');
+            
+            switch(mode) {
+                case 'inspect': statusBar.textContent = "Active Mode: Inspect / Move | Click elements to check metrics."; break;
+                case 'wall-v': statusBar.textContent = "Active Mode: Place Wall | Click on the canvas grid floor line to drop vertical partition line."; break;
+                case 'wall-h': statusBar.textContent = "Active Mode: Place Wall | Click on the canvas grid floor line to drop horizontal partition line."; break;
+                case 'door': statusBar.textContent = "Active Mode: Install Door | Click near room entry points to hinge structural doors."; break;
+                case 'window': statusBar.textContent = "Active Mode: Punch Window | Click along custom interior partitions to frame windows."; break;
+                case 'delete': statusBar.textContent = "Active Mode: Erase Component | Click directly on custom walls, doors, or windows to drop them."; break;
+            }
+        }
+
+        clickOverlay.addEventListener('click', function(e) {
+            const rect = blueprintFrame.getBoundingClientRect();
+            const posX = Math.round(e.clientX - rect.left);
+            const posY = Math.round(e.clientY - rect.top);
+
+            if (currentMode === 'wall-v') {
+                createWall(posX, posY, 'v');
+            } else if (currentMode === 'wall-h') {
+                createWall(posX, posY, 'h');
+            } else if (currentMode === 'door') {
+                createFeature(posX, posY, 'door');
+            } else if (currentMode === 'window') {
+                createFeature(posX, posY, 'window');
+            }
+        });
+
+        function createWall(x, y, orientation) {
+            const wall = document.createElement('div');
+            wall.classList.add('added-wall');
+            
+            if (orientation === 'v') {
+                wall.classList.add('v-wall');
+                wall.style.left = `${x}px`;
+                wall.style.top = `${Math.max(0, y - 60)}px`;
+                wall.style.height = '120px';
+            } else {
+                wall.classList.add('h-wall');
+                wall.style.left = `${Math.max(0, x - 60)}px`;
+                wall.style.top = `${y}px`;
+                wall.style.width = '120px';
+            }
+
+            attachElementRemover(wall);
+            blueprintFrame.appendChild(wall);
+        }
+
+        function createFeature(x, y, type) {
+            const element = document.createElement('div');
+            element.classList.add(type === 'door' ? 'added-door' : 'added-window');
+            element.style.left = `${x - 12}px`;
+            element.style.top = `${y - 4}px`;
+
+            attachElementRemover(element);
+            blueprintFrame.appendChild(element);
+        }
+
+        function attachElementRemover(el) {
+            el.addEventListener('click', function(e) {
+                if (currentMode === 'delete') {
+                    e.stopPropagation();
+                    el.remove();
+                    statusBar.textContent = "Component removed successfully from layout frame.";
+                }
+            });
+        }
+
+        function clearCustomizations() {
+            if (confirm("Are you sure you want to clear all custom modifications from this layout?")) {
+                document.querySelectorAll('.added-wall, .added-door, .added-window').forEach(el => el.remove());
+                setMode('inspect');
+            }
+        }
+    </script>
+</body>
+</html>
